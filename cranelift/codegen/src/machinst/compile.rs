@@ -72,12 +72,19 @@ pub fn compile<B: LowerBackend + TargetIsa>(
 
         regalloc2::run(&vcode, vcode.abi.machine_env(), &options)
             .map_err(|err| {
-                log::error!(
-                    "Register allocation error for vcode\n{vcode:?}\nError: {err:?}\nCLIF for error:\n{f:?}",
-                );
-                err
-            })
-            .expect("register allocation")
+                match err {
+                    regalloc2::RegAllocError::FuelExhausted => {
+                        log::warn!("register allocation fuel exhausted");
+                        return CodegenError::ImplLimitExceeded;
+                    }
+                    _ => {
+                        log::error!(
+                            "Register allocation error for vcode\n{vcode:?}\nError: {err:?}\nCLIF for error:\n{f:?}",
+                        );
+                        panic!("register allocation: {err:?}");
+                    }
+                }
+            })?
     };
 
     // Run the regalloc checker, if requested.
